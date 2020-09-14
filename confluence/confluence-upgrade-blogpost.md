@@ -1,8 +1,10 @@
+! [https://www.atlassian.com/dam/jcr:a22c9f02-b225-4e34-9f1d-e5ac0265e543/Confluence@2x-blue.png](https://www.atlassian.com/dam/jcr:a22c9f02-b225-4e34-9f1d-e5ac0265e543/Confluence@2x-blue.png)
+
 # Migrate Confluence 6.4 standalone to 7.3 data-center with confidence
 
 So, you are using Atlassian's Confluence in your organization, and it has been crucial in documenting and maintaining all the IP (intellectual property). The business needs prevent you from taking it down for upgrades. Considering it's critical role, the impact of it's downtime, and the perceived complexity during the possible upgrade prevents anyone from touching it. Now you fear that it may eventually become too old to upgrade. 
 
-Well, we are here to fix that!
+Well, we are here to help you with that!
 
 Recently, I undertook a similar project for one of our clients, and I documented all the steps along the way. The document eventually became - what we call - an engineering blog post, and we thought  we can share it with the world, so everyone can benefit from it. This document should make sense of all the steps you are required to perform to upgrade your instance of Confluence.
 
@@ -45,6 +47,7 @@ All VMs in this setup run on top of VMware, and run Linux OS. It is OK if you ar
 It is expected that you test the complete plan on some test infrastructure. When successful, **only then** perform the production migration.
 
 ## Pre-flight checks/preparation:
+* Make sure that you/client/business are aware of the add-ons/plugins which will **not** be upgrade-able, and if the client/business is willing to sacrifice the functionality previously provided by those add-ons/plugins.
 * In case your Confluence instance looks up user information from a Jira server (Crowd), then make sure that the new Confluence (test and production) servers' IP addresses are added to the "Jira User Server" on production Jira instance. `Jira -> Settings -> User management -> Jira user server`
 * In case your Confluence instance looks up user information from a LDAP/AD server, then make sure that the new Confluence (test and production) servers' IP addresses are allowed to access the LDAP/AD.
 * Have a SSL reverse-proxy/load-balancer ready with session affinity and WebSockets support. This will be configured later to point to your new Confluence (test or production) setup.

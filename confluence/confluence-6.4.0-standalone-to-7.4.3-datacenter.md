@@ -2,7 +2,7 @@
 
 I chose to write this guide because I needed a concise step-by-step "how-to" to upgrade a confluence (standalone) instance to data-center for a client. I thought that there should be a complete guide which not only benefits me, but also benefits my colleagues, and of-course other people in the world. 
 
-Atlassian's official documentation lacks information about various important tasks, which are critical. For example, Atlassian does not talk about the configuration of the PostgreSQL database server, or the NFS share, or synchronization of time across all infrastructure. I consider them extremely important to mention in any such guide. A lot of deployments are VM based, and the choice of Virtualization technology, and the configuration of the Virtualization host is also something to be kept under consideration. Encryption-at-rest, i.e. disk encryption is also a factor in performance, as it slows down I/O operations. The network firewalls, antivirus, and other security measures also play their role in performance. In short, many aspects around OS, Network and Security, must be considered, evaluated and configured properly before expecting performance from any of your service, whether it is Atlassian product or not.
+While working on this project, I noticed that Atlassian's official documentation lacks information about various important tasks, which are critical. For example, Atlassian does not talk about the configuration of the PostgreSQL database server, or the NFS share, or synchronization of time across entire infrastructure. I consider these important to be mentioned in any such guide. A lot of deployments are VM based, and the choice of Virtualization technology, it's overhead, and the configuration of the Virtualization host is also something to be kept under consideration. Encryption-at-rest, i.e. disk encryption is also a factor in performance, as it slows down I/O operations. The network firewalls, antivirus, and other security measures also play their role in performance. In short, many aspects around OS, Network and Security, must be considered, evaluated and configured properly before expecting performance from any of your service, whether it is Atlassian product or not.
 
 **This guide talks about Confluence, but the general principles apply to Jira as well.**
 
@@ -51,7 +51,7 @@ It is expected that you test the complete plan on some test infrastructure. When
 * Preferably disable SELinux / AppArmor; or, set the right security context for the directories where the Confluence process will read and write files. Remember, SELinux requires a filesystem that supports "security labels", and thus cannot provide access control for files mounted via NFS.
 * Since this is a "cluster", **NTP/Chrony** needs to be installed and it's service running - on all servers.
 * System timezone should be correctly configured - on all servers.
-* Install `fontconfig` and `fonts-dejavu-core` OS packages - on all confluence servers. This will save you from some pain later.
+* Install `fontconfig` and related OS packages - on all confluence servers. This will save you from some pain later.
 * Create `confluence` user and `confluence` group - on all confluence servers - **with same UID and GID**.
 * Synchronize necessary SSH keys to the DB and Confluence servers
 * Improve NFS server (and client) performance
@@ -143,7 +143,7 @@ ln -s -f  /usr/share/zoneinfo/Europe/Oslo  /etc/localtime
 
 
 ### Install fontconfig on all confluence servers:
-If fontconfig is absent from the OS, you will get an error message from Confluence:
+If `fontconfig` is absent from the OS, you will get an error message from Confluence:
 
 > **"The Fonts health check has failed in your system."**
 
@@ -365,9 +365,55 @@ Make a note of the output of the above command. This will act as your base value
 * -w : window size / socket buffer size (this gets sent to the server and used on that side too)
 
 
+#### Sample `iperf` output from two physical computers connected to 1Gbps switch:
+
+```
+[root@pserver5 ~]# iperf3 -s 
+-----------------------------------------------------------
+Server listening on 5201
+```
+
+```
+[root@client-pc ~]# iperf3 -c 192.168.0.10
+Connecting to host 192.168.0.10, port 5201
+[  5] local 192.168.0.62 port 54202 connected to 192.168.0.10 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   112 MBytes   943 Mbits/sec    0    329 KBytes       
+[  5]   1.00-2.00   sec   111 MBytes   934 Mbits/sec    0    376 KBytes       
+[  5]   2.00-3.00   sec   112 MBytes   938 Mbits/sec    0    376 KBytes       
+[  5]   3.00-4.00   sec   111 MBytes   930 Mbits/sec    0    376 KBytes       
+[  5]   4.00-5.00   sec   111 MBytes   931 Mbits/sec    0    395 KBytes       
+[  5]   5.00-6.00   sec   112 MBytes   936 Mbits/sec    0    416 KBytes       
+[  5]   6.00-7.00   sec   111 MBytes   934 Mbits/sec    0    416 KBytes       
+[  5]   7.00-8.00   sec   111 MBytes   934 Mbits/sec    0    416 KBytes       
+[  5]   8.00-9.00   sec   111 MBytes   934 Mbits/sec    0    416 KBytes       
+[  5]   9.00-10.00  sec   111 MBytes   927 Mbits/sec    0    416 KBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec  1.09 GBytes   934 Mbits/sec    0             sender
+[  5]   0.00-10.00  sec  1.09 GBytes   933 Mbits/sec                  receiver
+
+iperf Done.
+[root@client-pc ~]#
+```
+
+### Other non-obvious players affecting performance:
+* Configuration and quality of the networking equipment
+* Network hops between servers
+* Routers/firewalls between different network segments
+* Host firewall rules on individual servers
+* SELinux /App Armour
+* AntiVirus 
+* Encryption at rest (disk encryption)
+* Encryption in transit (SCP, rsync over SSH, SFTP)
+* Virtualization overhead
+
+
 ## Tune network related settings on OS - on all new servers - optional (Advanced topic):
 
-The default TCP network queue sizes are very small by default (~ 200KB). They needs to be increased, on NFS servers and NFS clients:
+TCP tuning may not result in huge performance gain. However, when you have configured the rest of infrastructure correctly, and have will (and patience) to turn more knobs to squeeze maximum juice out of the network stack, then this might be of interest to you. Intimate knowledge of Linux OS is required, and if set incorrectly, it can actually result in degraded performance. Tread carefully.
+
+The default TCP network queue sizes are set to very small by default (~ 200KB). They can be increased, on NFS servers and NFS clients:
 
 ```
 [root@confluence1 ~]# cat /proc/sys/net/core/rmem_default
@@ -436,9 +482,9 @@ References:
 
 ------------
 
-## Check NFS performance again after TCP tuning
+## Check network performance again after TCP tuning:
 
-
+### iperf:
 At this point, you should run the network benchmarks again, and see if you get any improvement. If not, then perhaps that is the max you can extract out of it.
 
 Run iperf3 on the NFS server:
@@ -450,6 +496,36 @@ On the client, run iperf3 to connect to iperf3 running on the NFS server. The co
 ```
 iperf3 -c nfs.example.com
 ```
+
+### File creation over NFS:
+
+The NFS mount is mounted with the following options:
+```
+[root@client-pc ~]# mount
+. . . 
+192.168.0.10:/opt/nfs on /mnt/nfs type nfs (rw,noatime,vers=3,rsize=1048576,wsize=1048576,namlen=255,hard,proto=tcp,timeo=600,retrans=2,sec=sys,mountaddr=192.168.0.10,mountvers=3,mountport=20048,mountproto=tcp,local_lock=none,addr=192.168.0.10)
+```
+
+Below is output of a dd command used to write a 1GB file using NFS, over a 1Gbit network switch in my home. Both client and servers are physical hosts.
+
+```
+[root@client-pc ~]# time dd  if=/dev/zero of=/mnt/nfs/nfs-1G.tmp bs=1M count=1024
+1024+0 records in
+1024+0 records out
+1073741824 bytes (1.1 GB, 1.0 GiB) copied, 9.83763 s, 109 MB/s
+
+real	0m10.185s
+user	0m0.003s
+sys	0m0.689s
+[root@client-pc ~]# 
+```
+
+
+We know that `1Gbps/8` is `125MBps`. Above, I got the throughput of `109 MBps`. If we do the math, `109 Mbps / 125 Mbps * 100` gives us `87.2`, which is 87.2% efficiency - not bad!. 
+
+Just so you know, the network switch used in this example is a cheap off-the-shelf switch preventing me from achieving higher performance. So, quality of the network equipment matters too.
+
+
 ------------ 
 
 ## Increase various OS/kernel limits on all servers:
@@ -703,10 +779,10 @@ The above two files have different locations on Red Hat and derivatives and Debi
 [postgres@db ~]$ echo $PGDATA 
 /var/lib/pgsql/9.6/data
 
-[postgres@db ~] ls -l $PGDATA/pg_hba.conf $PGDATA/postgresql.conf 
+[postgres@db ~]$ ls -l $PGDATA/pg_hba.conf $PGDATA/postgresql.conf 
 -rw-------. 1 postgres postgres  4224 Sep  9 14:01 /var/lib/pgsql/9.6/data/pg_hba.conf
 -rw-------. 1 postgres postgres 22526 Sep  9 14:01 /var/lib/pgsql/9.6/data/postgresql.conf
-[postgres@db ~] 
+[postgres@db ~]$ 
 ```
 
 #### Connect to postgres and verify:
@@ -2268,7 +2344,7 @@ tcp6       0      0 :::59011                :::*                    LISTEN      
 [root@confluence1 ~]# 
 ```
 
-After couple of hours, the logs will start showing that Synchrony is working and is getting a HTTP code `200` from `/synchrony/heartbeat` , which is being served by confluence  `https://confluence.example.com` . This means Confluence and Synchrony have both started. 
+After some waiting, the logs will start showing that Synchrony is working and is getting a HTTP code `200` from `/synchrony/heartbeat` , which is being served by confluence  `https://confluence.example.com` . This means Confluence and Synchrony have both started. 
 
 ```
 [root@confluence1 ~]# tail -f /var/atlassian/application-data/confluence/logs/*
@@ -2719,10 +2795,12 @@ Make sure that General Settings -> Clustering show you **all three nodes** at th
 * Check add-ons / plugins
 * Check editing a page.
 * Check indexing by Re-indexing. 
+* Enable User Directories, so AD/LDAP users are now able to login.
 * Update plugins: 
  * Atlassian Universal Plugin Manager
  * Atlassian Troubleshooting and Support Tools
  * Team Calendars
+ * . . . 
 
  
 

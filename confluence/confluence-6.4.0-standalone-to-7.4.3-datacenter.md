@@ -42,6 +42,7 @@ All VMs in this setup run Linux OS.
 It is expected that you test the complete plan on some test infrastructure. When successful, **only then** perform the production migration.
 
 ## Pre-flight checks/preparation:
+* Make sure that you/client/business are aware of the add-ons/plugins which will **not** be upgrade-able, and if the client/business is willing to sacrifice the functionality previously provided by those add-ons/plugins.
 * In case your Confluence instance looks up user information from a Jira server (Crowd), then make sure that the new Confluence (test and production) servers' IP addresses are added to the "Jira User Server" on production Jira instance. `Jira -> Settings -> User management -> Jira user server`
 * In case your Confluence instance looks up user information from a LDAP/AD server, then make sure that the new Confluence (test and production) servers' IP addresses are allowed to access the LDAP/AD.
 * Have a SSL reverse-proxy/load-balancer ready with session affinity and WebSockets support. This will be configured later to point to your new Confluence (test or production) setup.
@@ -1478,7 +1479,7 @@ The code below is useful to achieve this. Execute as `root` on the old Confluenc
 ```
 cd /var/atlassian/application-data/confluence
 
-time for i in analytics-logs attachments.orig backups bundled-plugins confluence.cfg.xml imgEffects index journal lock plugins-cache plugins-osgi-cache plugins-temp synchrony-args.properties thumbnails viewfile webresource-temp; do
+time for i in bundled-plugins confluence.cfg.xml imgEffects index journal lock plugins-cache plugins-osgi-cache plugins-temp synchrony-args.properties thumbnails viewfile webresource-temp; do
 
   echo "---> Copying ${i} ..."
   rsync -a ${i} confluence@confluence1.example.com:/var/atlassian/application-data/confluence/
@@ -1492,8 +1493,6 @@ The actual output from above command will be:
 [root@old-confluence ~]# cd /var/atlassian/application-data/confluence
 
 [root@old-confluence confluence]# time for i in analytics-logs attachments.orig bundled-plugins confluence.cfg.xml imgEffects index journal lock plugins-cache plugins-osgi-cache plugins-temp synchrony-args.properties thumbnails viewfile webresource-temp; do   echo "---> Copying ${i} ...";   rsync -a ${i} confluence@confluence1.example.com:/var/atlassian/application-data/confluence/; done
----> Copying analytics-logs ...
----> Copying attachments.orig ...
 ---> Copying bundled-plugins ...
 ---> Copying confluence.cfg.xml ...
 ---> Copying imgEffects ...
@@ -1828,6 +1827,11 @@ Reference: [https://confluence.atlassian.com/conf64/moving-to-confluence-data-ce
 
 To convert Confluence from stand-alone to data-center:
 * Apply a data center license to currently running Confluence (Standalone) instance (`6.4.0`) . Settings -> License Details -> Update License. This will trigger migration, but nothing will happen.
+
+
+| ! [images/post-license-trigger.png](images/post-license-trigger.png) |
+| -------------------------------------------------------------------- |
+
 * Stop Confluence
 * Create a directory that's accessible to all cluster nodes via the same path. The directory should be empty. This will be your shared home directory. **Note:** We have setup `/confluence` on all nodes, which is a NFS mount. We have created `/confluence/shared-home` and have our `shared-home` and `attachments` already inside it, and we are using symbolic links from inside our confluence data directory - (local home) - to access them. 
 * In your existing Confluence (local home) directory, move the contents of `<confluence local  home>/shared-home` to the new shared home directory you just created. (explained in the previous point). 
